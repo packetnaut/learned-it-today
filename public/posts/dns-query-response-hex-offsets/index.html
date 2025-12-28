@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head><script src="/learned-it-today/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=learned-it-today/livereload" data-no-instant defer></script><title>Deeper Dive: DNS Query and Response with Wireshark and tcpdump with HEX Offsets &ndash; learned-it-today</title>
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8"/>
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.4/css/academicons.min.css" integrity="sha512-IW0nhlW5MgNydsXJO40En2EoCkTTjZhI3yuODrZIc8cQ4h1XcF53PsqDHa09NqnkXuIe0Oiyyj171BqZFwISBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+<link rel="stylesheet" href="http://localhost:1313/learned-it-today/css/palettes/base16-dark.css">
+<link rel="stylesheet" href="http://localhost:1313/learned-it-today/css/risotto.css">
+<link rel="stylesheet" href="http://localhost:1313/learned-it-today/css/custom.css">
+
+
+
+
+
+
+
+
+
+
+
+
+<meta property="og:title" content="Deeper Dive: DNS Query and Response with Wireshark and tcpdump with HEX Offsets &ndash; learned-it-today" />
+<meta property="og:url" content="http://localhost:1313/learned-it-today/posts/dns-query-response-hex-offsets/" />
+
+  
+
+<meta property="og:locale" content="en-us" />
+</head>
+
+    <body>
+        <div class="page">
+
+            <header class="page__header"><nav class="page__nav main-nav">
+    <ul>
+      <li class="nomarker"><h1 class="page__logo"><a href="http://localhost:1313/learned-it-today/" class="page__logo-inner">learned-it-today</a></h1></li>
+    
+    
+    <li class="main-nav__item"><a class="nav-main-item" href="http://localhost:1313/learned-it-today/posts/" title="">posts</a></li>
+    
+    <li class="main-nav__item"><a class="nav-main-item" href="http://localhost:1313/learned-it-today/tags/" title="">tags</a></li>
+    
+    <li class="main-nav__item"><a class="nav-main-item" href="http://localhost:1313/learned-it-today/about/" title="">about</a></li>
+    
+    </ul>
+</nav>
+
+</header>
+
+            <section class="page__body">
+    <header class="content__header">
+        <h1>Deeper Dive: DNS Query and Response with Wireshark and tcpdump with HEX Offsets</h1>
+    </header>
+    <div class="content__body">
+        <p>Hello everyone, this is my first post. I am doing the Protocol Deep Dive: DNS course on Pluralsight by Betty DuBois. It was very well explained — the course duration is 2h 21mins but she gives so much relevant information I take almost 1–2 hours to do a 20 min video.</p>
+<p>In my attempts to sharpen my tcpdump skills, I decided to look at the packet examples both in Wireshark and tcpdump to decipher the tcpdump gibberish I saw and also dive deeper into the DNS packets.</p>
+<h2 id="the-dns-query">The DNS Query</h2>
+<p>Let&rsquo;s dive right in, the first packet we will look at is a DNS query.</p>
+<p>In Wireshark it looks like this. Notice in order to filter down the packets to a relevant packet you are interested in you can use the filter: <code>dns.qry.name contains &quot;XXX&quot;</code>. Here we can see the transaction ID of our query:</p>
+<p>To do this in tcpdump, this is our basic command as well as a few additional flags I added. In green we see the decimal equivalent of the transaction ID:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>tcpdump -r PCAP -s0 -Snnvvl | grep <span style="color:#e6db74">&#39;sales&#39;</span>
+</span></span></code></pre></div><p>Let&rsquo;s break this down:</p>
+<ul>
+<li><code>-r PCAP</code>: Read packets from a file rather than capturing live packets from a network interface. Replace <code>PCAP</code> with the actual file name of the packet capture file you want to analyze.</li>
+<li><code>-s0</code>: Sets the snapshot length to 0, meaning <code>tcpdump</code> will capture the entire packet. By default, <code>tcpdump</code> only captures the first 96 bytes of each packet, but setting it to 0 ensures that no part of the packet is truncated.</li>
+<li><code>-S</code>: Print absolute sequence numbers in TCP packets instead of relative sequence numbers. Helpful for detailed analysis.</li>
+<li><code>-nn</code>: Do not resolve hostnames and service names. Prints numeric IP addresses and port numbers, which speeds up the output and avoids DNS lookups.</li>
+<li><code>-v</code>: Increases the verbosity level, providing more detailed information about each packet.</li>
+<li><code>-l</code>: Makes the output line-buffered, useful when piping the output to another command (like <code>grep</code> in this case).</li>
+<li><code>grep 'sales'</code>: Pipes the output through <code>grep</code>, which searches for and displays only the lines that contain the string &lsquo;sales&rsquo;.</li>
+</ul>
+<h2 id="dns-flags">DNS Flags</h2>
+<p>Moving on to the flags, here we can see it is a standard query:</p>
+<ul>
+<li>If <strong>response</strong> is set to 0, it is a query</li>
+<li>If <strong>Opcode</strong> is also set to 0, it is a standard query</li>
+<li>If <strong>truncated</strong> is set, it means the packet was too large to send via UDP, so the packet was sent in TCP with multiple packets (however they may not be received in the same order it was sent)</li>
+<li><strong>Non-authenticated data</strong> means the client wants the server to check with the authoritative server first to ensure the data is good, and the server will respond from cache</li>
+</ul>
+<p>In order to convert <code>0x0100</code> to get the associated value for each flag field:</p>
+<pre tabindex="0"><code>|q| OP   |a|t|r|r|z|a|c|       |
+|r| code |a|c|d|a|Z|d|d| Rcode |
+</code></pre><p><code>0x0100</code>: Similar to calculating TCP flags, you need to convert each digit to binary:</p>
+<ul>
+<li>0 → 0000</li>
+<li>1 → 0001</li>
+<li>0 → 0000</li>
+<li>0 → 0000</li>
+</ul>
+<p>Combined: <code>0000 0001 0000 0000</code> — same as seen in Wireshark.</p>
+<h2 id="question-and-resource-record-counts">Question and Resource Record Counts</h2>
+<p>We have only 1 question, along with no Answer RRs, Authority RRs, or Additional RRs. These will be set in the reply. Here you can see it represented in HEX:</p>
+<ul>
+<li><code>00 01</code> for Questions</li>
+<li><code>00 00</code> for Answer RRs</li>
+<li><code>00 00</code> for Authority RRs</li>
+<li><code>00 00</code> for Additional RRs</li>
+</ul>
+<h2 id="query-labels">Query Labels</h2>
+<p>Moving on to the query, we can see the query length is 15 characters and it has 4 labels. Each label is the actual word seen in the query, for example:</p>
+<ul>
+<li>label 1: sales</li>
+<li>label 2: gt</li>
+<li>label 3: gm</li>
+<li>label 4: com</li>
+</ul>
+<p>When looking at the HEX prior to each label, you can see the length of the actual label.</p>
+<p>Let&rsquo;s look into the additional characteristics such as type and class of the query.</p>
+<h2 id="the-dns-response">The DNS Response</h2>
+<p>Let&rsquo;s dive into the response. As you can see, the transaction ID matches.</p>
+<p>In Wireshark it appears like this:</p>
+<p>So far it has been observed that the <code>*</code> attached to the query ID indicates an authoritative answer was observed in the DNS query response, meaning the responding server is an authority for the domain (NOT 100% sure).</p>
+<p>Moving forward after the query, we see <code>2/0/0</code> in tcpdump. This means:</p>
+<ul>
+<li>Answer RRs = 2</li>
+<li>Authority RRs = 0</li>
+<li>Additional RRs = 0</li>
+</ul>
+<p>Since the setup is load balanced, we receive responses from both. Depending on the load balance mechanism used, two different servers can respond to the same host queries. In green you can see the query along with the labels, the type and the class as shown above for the query.</p>
+<h2 id="dns-compression-the-0xc00c-pointer">DNS Compression: The 0xc00c Pointer</h2>
+<p>Following this, we see <code>0xc00c</code>. If you check to the left, it actually shows this value for the query name. Since the repetition of domain names is common in DNS responses, a compression mechanism is used to reduce the size of the packet.</p>
+<ul>
+<li>The value <code>0xc0</code> indicates that this is a pointer</li>
+<li><code>0x0c</code> is the offset of where the query name starts</li>
+</ul>
+<p>If there are different answers provided, the first query name will be at <code>0x0c</code>, however additional query name pointers will vary depending on where the query name was first defined in the packet.</p>
+<p><strong>IMPORTANT:</strong> This offset counter starts at the beginning of the DNS section in the packet, not at the start of the UDP packet. If we count, we add 12:</p>
+<ul>
+<li>Transaction ID: 2 bytes</li>
+<li>Flags: 2 bytes + 2 bytes (from above) = 4 bytes</li>
+<li>Questions: 2 bytes + 4 bytes (from above) = 6 bytes</li>
+<li>Answer RRs: 2 bytes + 6 bytes (from above) = 8 bytes</li>
+<li>Authority RRs: 2 bytes + 8 bytes (from above) = 10 bytes</li>
+<li>Additional RRs: 2 bytes + 10 bytes (from above) = 12 bytes</li>
+</ul>
+<p>Then we will be at the start of the query name: <strong>12 bytes = 0x0c</strong></p>
+<h2 id="multiple-answers">Multiple Answers</h2>
+<p>The same applies for the next answer. Since it is the exact query name as the previous answer, the pointer is assigned (<code>0xc00c</code>) the same offset as before.</p>
+<p>The only difference between the two answers is the IP addresses:</p>
+<ul>
+<li>First answer: <code>0x0a0c0308</code> = 10.12.3.8</li>
+<li>Second answer: <code>0x0a0c0312</code> = 10.12.3.18</li>
+</ul>
+<p>To further explain the pointer: if I have multiple answers with different query names because of DNS lookups, the query names are already defined in the previous answers and are being referenced with the pointer and the offset position.</p>
+<p><strong>Important to note:</strong> The offset counter is cumulative, meaning it is counting offset positions from the last pointer to be able to get to the next query. So <code>0xc02e</code> is 46 positions from the beginning of the query, and 34 positions after the last pointer.</p>
+<p>Same applies here: the pointer <code>0xc058</code> is 88 positions from the beginning of the query, and 42 positions after the last pointer.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://www.tcpdump.org/manpages/tcpdump.1.html">tcpdump man page</a></li>
+</ul>
+
+    </div>
+    <footer class="content__footer"></footer>
+
+            </section>
+
+            <section class="page__aside">
+                <div class="aside__about">
+
+<ul class="aside__social-links">
+    
+</ul>
+</div>
+                <hr>
+                <div class="aside__content">
+    
+    
+        <p>
+            
+            2024-05-26
+        </p>
+    
+
+    
+
+                </div>
+            </section>
+
+            <footer class="page__footer"><p>
+    
+    
+    
+    
+    
+    
+      
+    
+      
+    
+      
+    
+    
+    
+      
+      
+          
+            
+            
+                <br/><span class="active">$ echo $LANG<br/><b></b></span><br/>
+
+            
+          
+      
+    
+</p>
+<br /><br />
+<p class="copyright"></p>
+<p class="advertisement">Powered by <a href="https://gohugo.io/">hugo</a> and <a href="https://github.com/joeroe/risotto">risotto</a>.</p>
+</footer>
+
+        </div>
+    </body>
+
+</html>
