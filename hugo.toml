@@ -1,0 +1,24 @@
+baseURL = 'https://Learned-It-Today.github.io/packetnaut/'
+languageCode = 'en-us'
+title = 'packetnaut'
+theme = 'risotto'
+
+[params]
+  description = "Packet analysis, ICS security, and offensive research"
+  
+[taxonomies]
+  tag = "tags"
+
+[menu]
+  [[menu.main]]
+    name = "posts"
+    url = "/posts/"
+    weight = 1
+  [[menu.main]]
+    name = "tags"
+    url = "/tags/"
+    weight = 2
+  [[menu.main]]
+    name = "about"
+    url = "/about/"
+    weight = 3
