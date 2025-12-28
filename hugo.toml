@@ -1,6 +1,6 @@
-baseURL = 'https://Learned-It-Today.github.io/packetnaut/'
+baseURL = 'https://packetnaut.github.io/learned-it-today/'
 languageCode = 'en-us'
-title = 'packetnaut'
+title = 'learned-it-today'
 theme = 'risotto'
 
 [params]
